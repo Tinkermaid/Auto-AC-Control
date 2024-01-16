@@ -1,1 +1,543 @@
-this is the code
+// A/C HeletecAutoControl   V2 and V3 together
+
+/* In this updated code I fixed some bugs and replaced the delay with millis to make sure the display keeps working 
+while the transmission is delayed by the unsigned long Interval1 of 10 Minutes.
+
+The copyright to this sript belongs to David Conran, else to Lisa Price. 
+This is step3 to of my getting started guide, it is very easy and advanced programming skills 
+are not required. Anybody can do it!
+I ordered the code and added some code to support a OLED Display. 
+I used a heltec 32 kit, because it has the OLED build on it. 
+But it works just as good without the display. No code modification required. 
+*/
+
+/* This script (code) enables a Heltec esp32 Kit to controle the following A/C 
+//   Brand: Mirage,  Model: VLU series A/C
+//   Brand: Maxell,  Model: MX-CH18CF A/C
+//   Brand: Maxell,  Model: KKG9A-C1 remote
+//   Brand: Tronitechnik,  Model: Reykir 9000 A/C
+//   Brand: Tronitechnik,  Model: KKG29A-C1 
+
+with the following remote Control Units
+//   KKG29A-C1
+//   KKG9A-C1
+
+The script is dedicated to automatically regulate the temperature and humidity inside a indoor grow room. 
+It sets different temperatures for day or night time.
+The script enables a Heltec ESP32 Kit V2 or V3 to messure ambient temperature, ambient humidity and if the ambient light is ON or OFF. 
+
+The input sensors needed are: 
+1. DHT11 or DHT12
+2. A light sensor modul with a resistive lightsensor, LM396 and a Digital High Low output. Costs around 3 Dollars
+
+The output devices are: 
+1. A infrared diode with transistor, 
+please look at the circuit diagram inside the cankyoldgit github page for the IRremote8266 library.
+* Suggested circuit: https://github.com/crankyoldgit/IRremoteESP8266/wiki#ir-sending
+I bought a adafruit infrared development board, because it has additional 2 diods,one indicates when data is transmitted, 
+the second shows its powered up. 
+Also it has the transitor and some passive parts for better performance. 
+
+Optional devices 
+1. One or Two Relays, I use mostly Solid State Relays
+I dedicated 2 pins for the relays.
+One comes on when in cool mode. 
+The second comes on when in heat mode. 
+Alternative you can connect instead of the two relays two LED's. Red needs a 200 Ohm resistor and blue a 100 Ohm resister, 
+the GPIO pins are 3.3V.  
+ */
+/*
+* The IR LED circuit *MUST* be connected on a pin
+* as specified by kIrLed below.
+* TL;DR: The IR LED needs to be driven by a transistor for a good result.
+*
+* Common mistakes & tips:
+*   * Don't just connect the IR LED directly to the pin, it won't
+*     have enough current to drive the IR LED effectively.
+*   * Make sure you have the IR LED polarity correct.
+*     See: https://learn.sparkfun.com/tutorials/polarity/diode-and-led-polarity
+*   * Typical digital camera/phones can be used to see if the IR LED is flashed.
+*     Replace the IR LED with a normal LED if you don't have a digital camera
+*     when debugging.
+*/
+//Select the heltec Board Version: uploading will return an error for the disabledboard, thats ok.
+//#define heltec32
+#define heltec32v3
+
+#include <Arduino.h>  //Needed for VS Code with platformIO
+#include <IRremoteESP8266.h>  //The IR Library from crankyoldgit
+#include <IRsend.h>     //is located inside the esp8266 IRremote Library
+#include <ir_Mirage.h>  //is located inside the esp8266 IRremote Library/
+#include <heltec.h>          // Heltec Library , this LibrRY DRIVES THE NEW, alternative board ESP32 Kit from heltec and the OLED on it
+#include <DHT.h>  //The Library for the DHT Temp and Hum sensor.
+#define Type DHT11 // choose Sensor Type, DHT11, DHT22
+
+#ifdef heltec32
+const float th=14; //Ambient Temp and Hum on Input Pin 13 (D7) for Wemos, Pin 14 for Heltec V2,  Pin 6 for the Heltec V3.
+// create the object HT1, it uses the Pin:th and is a Sensor:Type
+DHT HT1(th,Type);
+
+const int lightPin = 27; //Input Pin for the light sensor is Pin 15 (D8)for the Wemos D1, Pin 27 heltec V2 and Pin 7 for the Heltec V3.
+
+//Output Pins
+const int heatPin = 5; /* Output Pin for the Relay to swich something like 
+a fan to help with heating. The GPIO Pin is Pin 12 (D6) for the Wemos D1 R2 ESP8266 and
+ GPIO 5 for heltec V2 and Pin 39 for heltec V3. */
+const int coolPin = 18; /* Output Pin for the Relay to swich something like 
+                       a fan to help with cooling is Pin 14 (D5) for Wemos D1 and Pin 18 heltec V2 and Pin 40 for Heltec V3*/
+const uint16_t kIrLed = 19;  // ESP8266 GPIO pin to use for IR Led. Recommended: 4 (D2) Wemos D1, Pin 19 heltec V2, Pin 42 for Heltec V3.
+IRMirageAc ac(kIrLed);  // Set the GPIO to be used for sending messages via IR Led.
+#endif
+#ifdef heltec32v3
+const float th=6; //Ambient Temp and Hum on Input Pin 13 (D7) for Wemos, Pin 14 for Heltec V2,  Pin 6 for the Heltec V3.
+// create the object HT1, it uses the Pin:th and is a Sensor:Type
+DHT HT1(th,Type);
+
+const int lightPin = 7; //Input Pin for the light sensor is Pin 15 (D8)for the Wemos D1, Pin 27 heltec V2 and Pin 7 for the Heltec V3.
+
+//Output Pins
+const int heatPin = 39; /* Output Pin for the Relay to swich something like 
+a fan to help with heating. The GPIO Pin is Pin 12 (D6) for the Wemos D1 R2 ESP8266 and
+ GPIO 5 for heltec V2 and Pin 39 for heltec V3. */
+const int coolPin = 40; /* Output Pin for the Relay to swich something like 
+                       a fan to help with cooling is Pin 14 (D5) for Wemos D1 and Pin 18 heltec V2 and Pin 40 for Heltec V3*/
+const uint16_t kIrLed = 42;  // ESP8266 GPIO pin to use for IR Led. Recommended: 4 (D2) Wemos D1, Pin 19 heltec V2, Pin 42 for Heltec V3.
+IRMirageAc ac(kIrLed);  // Set the GPIO to be used for sending messages via IR Led.
+#endif
+
+//Sensor Calibration variables for the DHT x=x*m+s s=shift, m=multiplyer
+//multiplyers (m)
+float mTempCal = 1;
+float mHumCal = 1;
+//shifts
+float sTempCal = 0;  //Room11 V3 : 0, Room 12 V2: 0,  Room 13 V....
+float sHumCal = 2;   //Room11 V3 : 2, Room 12 V2: 0,  Room 13 V....
+
+//Variables
+int VtempSet1 = 20; //  temperature ac setting in C for ON/OFF Cool Night, 
+int VtempSet2 = 16;  //  temperature ac setting in C for ON Heat Night
+int VtempSet3 = 25;  //  temperature ac setting in C ON/OFF Dry Day, ON Cool Day/Turbo
+int VtempSet4 = 22;  //   temp ac setting in C ON Heat Day
+
+
+//globalVariables
+float VtempC = 0;
+float VhumC = 0;
+int VheatPin = 0;
+int VheatStatus;
+int VcoolPin = 0;
+int VcoolStatus = 0;
+int VlightStatus ;
+int dt=500; //delaytime after sending prevents to many evaluations in a short time
+unsigned long previousTime1 = 0;
+unsigned long Interval1 = 10 *60 *1000 ;  //5 Minutes in milliseconds
+
+void readSensors() {
+// read the sensors and Pin Status into variables
+VlightStatus = !digitalRead(lightPin);
+VtempC = HT1.readTemperature()*mTempCal+sTempCal;
+VhumC = HT1.readHumidity()*mHumCal+sHumCal;
+VheatStatus = digitalRead(heatPin);
+VcoolStatus = digitalRead(coolPin);
+}
+
+void printState() {
+  // Display the settings.
+  Serial.println("The A/C remote is in the following state:");
+  Serial.printf("  %s\n", ac.toString().c_str());
+  // Display the encoded IR sequence.
+  unsigned char* ir_code = ac.getRaw();
+  Serial.print("IR Code: 0x");
+  for (uint8_t i = 0; i < kMirageStateLength; i++)
+    Serial.printf("%02X", ir_code[i]);
+  Serial.println();
+}
+
+void serialprintit() {
+//Serial.print the Sensor Data
+Serial.print("State of OUTPUT heatPin: ");
+Serial.println(VheatStatus);
+Serial.print("State of OUTPUT coolPin: ");
+Serial.println(VcoolStatus);
+Serial.print("State of INPUT lightPin: ");
+Serial.println(VlightStatus);
+Serial.print("Temperature reading of the DHT: ");
+Serial.println(VtempC);
+Serial.print("Humidity reading of the DHT: ");
+Serial.println(VhumC);
+Serial.println("Default state of the remote: ");
+  printState();
+Serial.println("Setting desired state for A/C: ");
+Serial.println();
+}
+
+void sendit() {
+  // Now send the IR signal.
+#if SEND_MITSUBISHI_AC
+  Serial.println("Sending IR command to A/C ...");
+  ac.send();
+#endif  // SEND_Mirage
+  printState();
+  delay(500); // delaytime after sending.
+}
+
+void drawString(String output, int fontSize)
+{
+  // outputs a string to the built-in OLED display
+  // on random locations to prevent burn in
+
+  // calculating the max value of x position on the display
+  // depending on the length of the string and the font size
+  unsigned int maxX = 128 - (output.length() * (fontSize / 2));
+  unsigned int maxY = 42; // one line of text, defalts to large font
+  // text appears in a random position on the display so that the OLED does not burn in
+  int randx = 0; // default 0
+  int randy = 0; // default 0
+
+  Heltec.display->clear();                           // clear the display
+  Heltec.display->setTextAlignment(TEXT_ALIGN_LEFT); // text will be aligned to the left
+  // there are only 3 font sizes to choose from!
+  switch (fontSize)
+  {
+  case 10:
+    Heltec.display->setFont(ArialMT_Plain_10); // Text size
+    maxY = 54; // maximum y position depends on font size
+    break;
+  case 16:
+    Heltec.display->setFont(ArialMT_Plain_16); // Text size
+    maxY = 49; // maximum y position depends on font size
+    break;
+  case 24:
+    Heltec.display->setFont(ArialMT_Plain_24); // Text size
+    maxY = 42; // maximum y position depends on font size
+    break;
+  default:
+    Heltec.display->setFont(ArialMT_Plain_16); // Text size
+    maxY = 49; // maximum y position depends on font size
+    break;
+  }
+
+  // text appears in a random position on the display so that the OLED does not burn in
+  randx = random(0, maxX); // random X postion
+  randy = random(0, maxY); // random Y position
+
+  Heltec.display->drawString(randx, randy, output); // draw the string
+  Heltec.display->display();                        // transfer it to display
+}
+
+void OLEDit() {
+String output; // storing the output text
+  //output data to OLED display
+  output = String(float(VtempC) ) + " °C";
+  drawString(output, 24); // font size
+  delay(2000);
+
+  output = String(VhumC) + " %"; // large font 24
+  drawString(output, 24);
+  delay(2000);
+}
+
+void setup() {
+  // put your setup code here to run once
+  pinMode (lightPin,INPUT);
+  pinMode (heatPin,OUTPUT);
+  pinMode (coolPin,OUTPUT);
+
+  HT1.begin();
+  ac.begin();
+  Serial.begin(115200);
+    while(!Serial);
+// initialize internal display first!
+  // this is important because it also makes the
+  // I2C bus activated, which we need for the BMP sensor
+  Heltec.begin(true /*DisplayEnable Enable*/, false /*LoRa Disable*/, true /*Serial Enable*/);
+  Heltec.display->resetOrientation();
+  Heltec.display->flipScreenVertically(); // flip display if needed
+  //Heltec.display->mirrorScreen();    // mirror display if needed e.g. on a HUD
+  Heltec.display->setFont(ArialMT_Plain_10); // use this font 
+
+
+  delay(200);
+}
+
+void loop() {
+
+// read the sensors and Pin Status into variables
+readSensors();
+OLEDit();
+unsigned long currentTime1 = millis();
+
+//1
+if (VlightStatus == 0 && VtempC > 19 && VtempC < 21 && currentTime1 - previousTime1 >=Interval1) 
+//If Temp is between 19-21 degree C and light is off turn A/C off.
+{
+  previousTime1 = currentTime1 ;
+
+  serialprintit();  //Prints the sensor readings, Pin status and Settings Status
+
+  // Set up what we want to send. See ir_Mirage.cpp for all the options.
+  // Most things default to off.
+  ac.setModel(KKG29AC1); //The Model of the remote control
+  ac.off();
+  ac.setPower(false);  // what is switched on and off with the Power function???
+  ac.setFan(kMirageAcKKG29AC1FanAuto); //kMirageAcKKG29AC1FanAuto, kMirageAcKKG29AC1FanHigh, kMirageAcKKG29AC1FanMed, kMirageAcKKG29AC1FanLow
+  ac.setMode(kMirageAcCool); //kMirageAcCool, kMirageAcDry, kMirageAcHeat, kMirageAcFan, kMirageAcRecycle
+  ac.setTemp(VtempSet1);
+  ac.setSwingV(false);
+  ac.setSwingH(false);
+  ac.setFilter(false);
+  //ac.setLight(true); //SetLight is a Toggle, so setting it to true will switch it off the next time, it toggles.
+  ac.setTurbo(false);
+  ac.setCleanToggle(false);
+
+  digitalWrite(heatPin,LOW);
+  digitalWrite(coolPin,LOW);
+
+  sendit();
+
+while (VlightStatus == 0 && VtempC >19 && VtempC <21)
+{
+// read temp and hum, and loops until sensor data gets out of the range
+readSensors();
+OLEDit();
+} 
+}
+//2
+if (VlightStatus == 0 && VtempC > 21 && currentTime1 - previousTime1 >=Interval1) 
+//If Temp is above 21 degree C and light is off start cool mode
+{
+  previousTime1 = currentTime1 ;
+  serialprintit();  //Prints the sensor readings, Pin status, Settings Status
+
+  // Set up what we want to send. See ir_Mirage.cpp for all the options.
+  // Most things default to off.  
+  ac.setModel(KKG29AC1);
+  ac.on();
+  ac.setPower(true); // what is switched on and off with the Power function???
+  ac.setFan(kMirageAcKKG29AC1FanAuto);
+  ac.setMode(kMirageAcCool);
+  ac.setTemp(VtempSet4);
+  ac.setSwingV(false);
+  ac.setSwingH(false);
+  ac.setFilter(true);
+  //ac.setLight(true); // I commented it out, in the hope it stays on
+  ac.setTurbo(false);
+  ac.setCleanToggle(false);
+
+  digitalWrite(heatPin,LOW);
+  digitalWrite(coolPin,HIGH);
+
+  sendit();
+
+  while (VlightStatus == 0 && VtempC > 21)
+  {
+  // read temp and hum, and loops until sensor data gets out of the range
+  readSensors();
+  OLEDit();
+  }   
+}
+
+//3
+if (VlightStatus == 0 && VtempC <18 && currentTime1 - previousTime1 >=Interval1) 
+//If Temp is below 18 degree C and light is off start heat mode
+{
+  previousTime1 = currentTime1 ;
+  serialprintit();  //Prints the sensor readings, Pin status, Settings Status
+
+  // Set up what we want to send. See ir_Mirage.cpp for all the options.
+  // Most things default to off.  
+  ac.setModel(KKG29AC1);
+  ac.on();
+  ac.setPower(true); // what is switched on and off with the Power function???
+  ac.setFan(kMirageAcKKG29AC1FanHigh);
+  ac.setMode(kMirageAcHeat);
+  ac.setTemp(VtempSet2);
+  ac.setSwingV(false);
+  ac.setSwingH(false);
+  ac.setFilter(true);
+ // ac.setLight(true);
+  ac.setTurbo(false);
+  ac.setCleanToggle(false);
+
+  digitalWrite(heatPin,HIGH);
+  digitalWrite(coolPin,LOW);
+
+  sendit();
+
+  while (VlightStatus == 0 && VtempC <18){
+// read temp and hum, and loops until sensor data gets out of the range
+readSensors();
+OLEDit();
+}
+}
+
+//4
+if (VlightStatus == 1 && VtempC >22 && VtempC <24 && VhumC > 1 && VhumC < 50 && currentTime1 - previousTime1 >=Interval1) 
+//If light is on and Temp is between 22 and 24 degree C and HUMidity is between 1% and 50% turn A/C off
+{
+  previousTime1 = currentTime1 ;
+  serialprintit();  //Prints the sensor readings, Pin status, Settings Status
+
+  // Set up what we want to send. See ir_Mirage.cpp for all the options.
+  // Most things default to off.  
+  ac.setModel(KKG29AC1);
+  ac.off();
+  ac.setPower(false); // what is switched on and off with the Power function???
+  ac.setFan(kMirageAcKKG29AC1FanAuto);
+  ac.setMode(kMirageAcDry);
+  ac.setTemp(VtempSet4);
+  ac.setSwingV(false);
+  ac.setSwingH(false);
+  ac.setFilter(false);
+ // ac.setLight(true);
+  ac.setTurbo(false);
+  ac.setCleanToggle(false);
+
+  digitalWrite(heatPin,LOW);
+  digitalWrite(coolPin,LOW);
+
+  sendit();
+
+  while (VlightStatus == 1 && VtempC >22 && VtempC <24 && VhumC > 1 && VhumC < 50)
+  {
+  // read temp and hum, and loops until sensor data gets out of the range
+  readSensors();
+  OLEDit();
+  } 
+}
+
+//5
+if (VlightStatus == 1 && VtempC >22 && VtempC <24 && VhumC > 50 && currentTime1 - previousTime1 >=Interval1) 
+//If light is on and Temp is between 22 and 24 degree C and HUMidity is above 50% start dry mode
+{
+  previousTime1 = currentTime1 ;
+  serialprintit();  //Prints the sensor readings, Pin status, Settings Status
+
+  // Set up what we want to send. See ir_Mirage.cpp for all the options.
+  // Most things default to off.  
+  ac.setModel(KKG29AC1);
+  ac.on();
+  ac.setPower(true); // what is switched on and off with the Power function???
+  ac.setFan(kMirageAcKKG29AC1FanAuto);
+  ac.setMode(kMirageAcDry);
+  ac.setTemp(VtempSet4);
+  ac.setSwingV(false);
+  ac.setSwingH(false);
+  ac.setFilter(true);
+  //ac.setLight(true);
+  ac.setTurbo(false);
+  ac.setCleanToggle(false);
+
+  digitalWrite(heatPin,LOW);
+  digitalWrite(coolPin,LOW);
+
+  sendit();
+
+  while (VlightStatus == 1 && VtempC >22 && VtempC <24 && VhumC > 50) {
+// read temp and hum, and loops until sensor data gets out of the range
+readSensors();
+OLEDit();
+}
+}
+
+//6
+if (VlightStatus == 1 && VtempC >24 && VtempC <27 && currentTime1 - previousTime1 >=Interval1) 
+//If light is on and Temp is between 24 and 27 degree C start cool mode.
+{
+  previousTime1 = currentTime1 ;
+  serialprintit();  //Prints the sensor readings, Pin status, Settings Status
+
+  // Set up what we want to send. See ir_Mirage.cpp for all the options.
+  // Most things default to off.  
+  ac.setModel(KKG29AC1);
+  ac.on();
+  ac.setPower(true); // what is switched on and off with the Power function???
+  ac.setFan(kMirageAcKKG29AC1FanAuto);
+  ac.setMode(kMirageAcCool);
+  ac.setTemp(VtempSet3);
+  ac.setSwingV(false);
+  ac.setSwingH(false);
+  ac.setFilter(true);
+  //ac.setLight(true);
+  ac.setTurbo(false);
+  ac.setCleanToggle(false);
+
+  digitalWrite(heatPin,LOW);
+  digitalWrite(coolPin,HIGH);
+
+  sendit();
+
+  while (VlightStatus == 1 && VtempC >24 && VtempC <27) {
+// read temp and hum, and loops until sensor data gets out of the range
+readSensors();
+OLEDit();
+}
+}
+
+//7
+if (VlightStatus == 1 && VtempC >30 && currentTime1 - previousTime1 >=Interval1) { 
+  //If light is on and Temp is above 30 degree C cool in turbo 
+  previousTime1 = currentTime1 ;
+  serialprintit();  //Prints the sensor readings, Pin status, Settings Status
+
+  // Set up what we want to send. See ir_Mirage.cpp for all the options.
+  // Most things default to off.  
+  ac.on();
+  ac.setPower(true); // what is switched on and off with the Power function???
+  ac.setFan(kMirageAcKKG29AC1FanAuto);
+  ac.setMode(kMirageAcCool);
+  ac.setTemp(VtempSet3);
+  ac.setSwingV(false);
+  ac.setSwingH(false);
+  ac.setFilter(false);
+ // ac.setLight(true);
+  ac.setTurbo(true);
+  ac.setCleanToggle(false);
+
+  digitalWrite(heatPin,LOW);
+  digitalWrite(coolPin,HIGH);
+
+  sendit();
+
+  while (VlightStatus == 1 && VtempC >30) {
+// read temp and hum, and loops until sensor data gets out of the range
+readSensors();
+OLEDit();
+}
+}
+
+//8
+if (VlightStatus == 1 && VtempC < 20 && currentTime1 - previousTime1 >=Interval1) 
+//If light is on and Temp is under 20 degree C start heat mode.
+{
+  previousTime1 = currentTime1 ;
+  serialprintit();  //Prints the sensor readings, Pin status, Settings Status
+  
+  // Set up what we want to send. See ir_Mirage.cpp for all the options.
+  // Most things default to off.  
+  ac.on();
+  ac.setPower(true); // what is switched on and off with the Power function???
+  ac.setFan(kMirageAcKKG29AC1FanMed);
+  ac.setMode(kMirageAcHeat);
+  ac.setTemp(VtempSet1);
+  ac.setSwingV(false);
+  ac.setSwingH(false);
+  ac.setFilter(true);
+ // ac.setLight(true);
+  ac.setTurbo(false);
+  ac.setCleanToggle(false);
+
+  digitalWrite(heatPin,HIGH);
+  digitalWrite(coolPin,LOW);
+
+  sendit();
+
+  while (VlightStatus == 1 && VtempC < 20) {
+// read temp and hum, and loops until sensor data gets out of the range
+readSensors();
+OLEDit();
+}
+}
+}
+
+
