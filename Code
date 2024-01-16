@@ -1,4 +1,4 @@
-// A/C HeletecAutoControl   V2 and V3 together
+// A/C Heletec AutoControl   V2 and V3 together
 
 /* In this updated code I fixed some bugs and replaced the delay with millis to make sure the display keeps working 
 while the transmission is delayed by the unsigned long Interval1 of 10 Minutes.
@@ -34,6 +34,7 @@ The output devices are:
 1. A infrared diode with transistor, 
 please look at the circuit diagram inside the cankyoldgit github page for the IRremote8266 library.
 * Suggested circuit: https://github.com/crankyoldgit/IRremoteESP8266/wiki#ir-sending
+  You will also find all the needed libraries there.
 I bought a adafruit infrared development board, because it has additional 2 diods,one indicates when data is transmitted, 
 the second shows its powered up. 
 Also it has the transitor and some passive parts for better performance. 
@@ -66,13 +67,13 @@ the GPIO pins are 3.3V.
 
 #include <Arduino.h>  //Needed for VS Code with platformIO
 #include <IRremoteESP8266.h>  //The IR Library from crankyoldgit
-#include <IRsend.h>     //is located inside the esp8266 IRremote Library
-#include <ir_Mirage.h>  //is located inside the esp8266 IRremote Library/
+#include <IRsend.h>     //is located inside the IRremoteESP8266.h Library
+#include <ir_Mirage.h>  //is located inside the IRremoteESP8266.h  Library/
 #include <heltec.h>          // Heltec Library , this LibrRY DRIVES THE NEW, alternative board ESP32 Kit from heltec and the OLED on it
 #include <DHT.h>  //The Library for the DHT Temp and Hum sensor.
 #define Type DHT11 // choose Sensor Type, DHT11, DHT22
 
-#ifdef heltec32
+#ifdef heltec32  //settings and pin numbers for the heltec V2
 const float th=14; //Ambient Temp and Hum on Input Pin 13 (D7) for Wemos, Pin 14 for Heltec V2,  Pin 6 for the Heltec V3.
 // create the object HT1, it uses the Pin:th and is a Sensor:Type
 DHT HT1(th,Type);
@@ -88,7 +89,8 @@ const int coolPin = 18; /* Output Pin for the Relay to swich something like
 const uint16_t kIrLed = 19;  // ESP8266 GPIO pin to use for IR Led. Recommended: 4 (D2) Wemos D1, Pin 19 heltec V2, Pin 42 for Heltec V3.
 IRMirageAc ac(kIrLed);  // Set the GPIO to be used for sending messages via IR Led.
 #endif
-#ifdef heltec32v3
+
+#ifdef heltec32v3 //settings and pin numbers for the heltec V3
 const float th=6; //Ambient Temp and Hum on Input Pin 13 (D7) for Wemos, Pin 14 for Heltec V2,  Pin 6 for the Heltec V3.
 // create the object HT1, it uses the Pin:th and is a Sensor:Type
 DHT HT1(th,Type);
