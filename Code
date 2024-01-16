@@ -112,17 +112,17 @@ IRMirageAc ac(kIrLed);  // Set the GPIO to be used for sending messages via IR L
 float mTempCal = 1;
 float mHumCal = 1;
 //shifts
-float sTempCal = 0;  //Room11 V3 : 0, Room 12 V2: 0,  Room 13 V....
-float sHumCal = 2;   //Room11 V3 : 2, Room 12 V2: 0,  Room 13 V....
+float sTempCal = 0;  //
+float sHumCal = 2;   //
 
-//Variables
-int VtempSet1 = 20; //  temperature ac setting in C for ON/OFF Cool Night, 
-int VtempSet2 = 16;  //  temperature ac setting in C for ON Heat Night
-int VtempSet3 = 25;  //  temperature ac setting in C ON/OFF Dry Day, ON Cool Day/Turbo
-int VtempSet4 = 22;  //   temp ac setting in C ON Heat Day
+//temperature settings Variables
+int VtempSet1 = 20; //  temperature ac setting in C used for ON/OFF, Cool Night, 
+int VtempSet2 = 16;  //  temperature ac setting in C used for ON, Heat, Night,
+int VtempSet3 = 25;  //  temperature ac setting in C used for ON/OFF, Dry, Day, ON, Cool, Day/Turbo,
+int VtempSet4 = 22;  //   temp ac setting in C used for ON, Heat, Day,
 
 
-//globalVariables
+//other global Variables
 float VtempC = 0;
 float VhumC = 0;
 int VheatPin = 0;
